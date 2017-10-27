@@ -2,217 +2,298 @@ package stream
 
 import (
 	"fmt"
-	"strconv"
+	"math/rand"
 	"testing"
-	"time"
 )
 
-type person struct {
-	name  string
-	age   int
-	birth time.Time
+type student struct {
+	id     int
+	name   string
+	age    int
+	scores []int
 }
 
-func (p *person) String() string {
-	return fmt.Sprintf("{name:%s, age:%d, birth: %s}", p.name, p.age, strconv.Itoa(p.birth.Year()))
+func (s *student) String() string {
+	return fmt.Sprintf("{id:%d, name:%s, age:%d,scores:%v}", s.id, s.name, s.age, s.scores)
 }
 
-func newPersons() []person {
-	persons := make([]person, 10)
+func createStudents() []student {
+	names := []string{"Tom", "Kate", "Lucy", "Jim", "Jack", "King", "Lee", "Mask"}
+	students := make([]student, 10)
+	rnd := func(start, end int) int { return rand.Intn(end-start) + start }
 	for i := 0; i < 10; i++ {
-		persons[i] = person{
-			name:  "Name-" + strconv.Itoa(i),
-			age:   i,
-			birth: time.Now().AddDate(-i, 0, 0),
+		students[i] = student{
+			id:     i + 1,
+			name:   names[rand.Intn(len(names))],
+			age:    rnd(15, 26),
+			scores: []int{rnd(60, 100), rnd(60, 100), rnd(60, 100)},
 		}
 	}
-	return persons
+	return students
+}
+
+type node struct {
+	id   int
+	next *node
+}
+
+func createNodes() *node {
+	i := 10
+	n := &node{id: i}
+	for i > 0 {
+		i--
+		n = &node{id: i, next: n}
+	}
+	return n
 }
 
 func TestNew(t *testing.T) {
-	persons := newPersons()
-	stream, _ := New(persons)
+	students := createStudents()
+	stream, _ := New(students)
 
-	fmt.Printf("persons: %v \n", persons)
-	fmt.Printf("stream: %v \n", stream)
+	fmt.Println(t.Name() + ":")
+	stream.ForEach(func(s student) {
+		fmt.Printf("\t%s\n", s.String())
+	})
+	fmt.Println()
+}
+
+func TestIterate(t *testing.T) {
+	root := createNodes()
+
+	fmt.Println(t.Name() + ":")
+	stream, _ := It(root, func(n *node) (*node, bool) {
+		return n.next, n.next.next != nil
+	})
+	stream.ForEach(func(n *node) {
+		fmt.Printf("\tnode{id:%d}\n", n.id)
+	})
+	fmt.Println()
+}
+
+func TestGenerate(t *testing.T) {
+	fmt.Println(t.Name() + ":")
+	stream, _ := Gen(func() (int, bool) {
+		x := rand.Intn(10)
+		return x, x < 8
+	})
+	stream.ForEach(func(x int) {
+		fmt.Printf("\t%d\n", x)
+	})
+	fmt.Println()
 }
 
 func TestFilter(t *testing.T) {
-	persons := newPersons()
-	stream, _ := New(persons)
+	fmt.Println(t.Name() + ": by age > 20")
 
-	r := stream.Filter(func(p person) bool {
-		return p.age > 5
-	}).Collect()
-	fmt.Printf("Filter result : %#v \n", r)
+	students := createStudents()
+	stream, _ := New(students)
+
+	stream.Filter(func(s student) bool {
+		return s.age > 20
+	}).ForEach(func(s student) {
+		fmt.Printf("\t%s\n", s.String())
+	})
+	fmt.Printf("\n")
 }
 
 func TestMap(t *testing.T) {
-	persons := newPersons()
-	stream, _ := New(persons)
+	fmt.Println(t.Name() + ": by name")
+	students := createStudents()
+	stream, _ := New(students)
 
-	r := stream.Map(func(p person) string {
-		return p.name
+	stream.Map(func(s student) string {
+		return s.name
+	}).ForEach(func(s string) {
+		fmt.Printf("\t%s\n", s)
+	})
+	fmt.Println()
+}
+
+func TestFlatMap(t *testing.T) {
+	fmt.Println(t.Name() + ": by scores")
+	students := createStudents()
+	stream, _ := New(students)
+
+	r := stream.FlatMap(func(s student) []int {
+		return s.scores
 	}).Collect()
-	fmt.Printf("Map result : %#v \n", r)
+	fmt.Printf("\t%v\n", r)
 }
 
 func TestSort(t *testing.T) {
-	persons := newPersons()
-	stream, _ := New(persons)
+	fmt.Println(t.Name() + ": by scores desc")
+	students := createStudents()
+	stream, _ := New(students)
 
-	r := stream.Sort(func(p1, p2 person) bool {
-		return p1.age < p2.age
-	}).Collect()
-	fmt.Printf("Sort result : %#v \n", r)
+	stream.Sort(func(s1, s2 student) bool {
+		return s1.scores[0]+s1.scores[1]+s1.scores[2] > s2.scores[0]+s2.scores[1]+s2.scores[2]
+	}).ForEach(func(s student) {
+		fmt.Printf("\t%s\n", s.String())
+	})
+	fmt.Println()
 }
 
 func TestDistinct(t *testing.T) {
-	persons := []person{
-		person{name: "Tom"},
-		person{name: "King"},
-		person{name: "Tom"},
-	}
-	stream, _ := New(persons)
-	r := stream.Distinct(func(p1, p2 person) bool {
-		return p1.name == p2.name
-	}).Collect()
-	fmt.Printf("Distinct result : %#v \n", r)
+	fmt.Println(t.Name() + ": by name")
+	students := createStudents()
+	stream, _ := New(students)
+
+	stream.Map(func(s student) string {
+		return s.name
+	}).Distinct(func(p1, p2 string) bool {
+		return p1 == p2
+	}).ForEach(func(s string) {
+		fmt.Printf("\t%s\n", s)
+	})
+	fmt.Println()
 }
 
-func TestEach(t *testing.T) {
-	persons := newPersons()
-	stream, _ := New(persons)
+func TestForEach(t *testing.T) {
+	fmt.Println(t.Name() + ": by name")
+	students := createStudents()
+	stream, _ := New(students)
 
-	fmt.Println("ForEach")
-	stream.ForEach(func(p person) {
-		fmt.Println(p)
+	stream.ForEach(func(s student) {
+		fmt.Printf("\t%s\n", s.String())
 	})
+	fmt.Println()
 }
 
 func TestMatch(t *testing.T) {
-	persons := newPersons()
-	stream, _ := New(persons)
+	fmt.Println(t.Name() + ":")
+	students := createStudents()
+	stream, _ := New(students)
 
-	r1 := stream.AllMatch(func(p person) bool {
-		return p.age > 5
+	r1 := stream.AllMatch(func(s student) bool {
+		return s.age > 20
 	})
 	stream.Reset()
-	r2 := stream.AnyMatch(func(p person) bool {
-		return p.name == "Name-1"
+	r2 := stream.AnyMatch(func(s student) bool {
+		return s.name == "Jim"
 	})
 	stream.Reset()
-	r3 := stream.NoneMatch(func(p person) bool {
-		return p.birth.Year() == 2015
+	r3 := stream.NoneMatch(func(s student) bool {
+		return s.scores[0]+s.scores[1]+s.scores[2] > 270
 	})
-	fmt.Printf("AllMatch: %t, AnyMatch: %t, NoneMatch: %t \n", r1, r2, r3)
+	fmt.Printf("\tAllMatch: %t, AnyMatch: %t, NoneMatch: %t \n", r1, r2, r3)
 }
 
 func TestCount(t *testing.T) {
-	persons := newPersons()
-	stream, _ := New(persons)
+	fmt.Println(t.Name() + ":")
+	students := createStudents()
+	stream, _ := New(students)
 
-	r := stream.Filter(func(p person) bool {
-		return p.age > 5
-	}).Count()
-	fmt.Printf("Count: %d \n", r)
+	r := stream.Count()
+	fmt.Printf("\t%d\n", r)
 }
 
 func TestMaxMin(t *testing.T) {
-	persons := newPersons()
-	stream, _ := New(persons)
+	fmt.Println(t.Name() + ": by scores")
+	students := createStudents()
+	stream, _ := New(students)
 
-	r1 := stream.Filter(func(p person) bool {
-		return p.age > 5
-	}).Max(func(p1, p2 person) bool {
-		return p1.age < p2.age
+	r1 := stream.Max(func(s1, s2 student) bool {
+		return s1.scores[0]+s1.scores[1]+s1.scores[2] < s2.scores[0]+s2.scores[1]+s2.scores[2]
 	})
 	stream.Reset()
-	r2 := stream.Filter(func(p person) bool {
-		return p.age < 5
-	}).Min(func(p1, p2 person) bool {
-		return p1.age < p2.age
+	r2 := stream.Min(func(s1, s2 student) bool {
+		return s1.scores[0]+s1.scores[1]+s1.scores[2] < s2.scores[0]+s2.scores[1]+s2.scores[2]
 	})
-	fmt.Printf("Max: %v, Min: %v \n", r1, r2)
+	fmt.Printf("\tMax: %v, Min: %v \n", r1, r2)
 }
 
 func TestPeek(t *testing.T) {
-	persons := newPersons()
-	stream, _ := New(persons)
-	fmt.Println("peek: ")
-	stream.Filter(func(p person) bool {
-		return p.age%2 == 0
-	}).Peek(func(p person) {
-		fmt.Println(p)
-	}).Filter(func(p person) bool {
-		return p.age > 5
-	}).Peek(func(p person) {
-		fmt.Println(p)
+	fmt.Println(t.Name() + ":")
+	students := createStudents()
+	stream, _ := New(students)
+
+	stream.Filter(func(s student) bool {
+		return s.age%2 == 0
+	}).Call(func() {
+		fmt.Println("\tfilter by age % 2 == 0")
+	}).Peek(func(s student) {
+		fmt.Printf("\t%s\n", s.String())
+	}).Filter(func(s student) bool {
+		return s.age > 18
+	}).Call(func() {
+		fmt.Println("\tfilter by age > 18")
+	}).Peek(func(s student) {
+		fmt.Printf("\t%s\n", s.String())
 	}).Exec()
 }
 
 func TestLimitSkip(t *testing.T) {
-	persons := newPersons()
-	stream, _ := New(persons)
+	fmt.Println(t.Name() + ":")
+	students := createStudents()
+	stream, _ := New(students)
 
-	r1 := stream.Limit(5).Collect()
+	stream.Limit(5).Call(func() {
+		fmt.Println("\tlimit by 5")
+	}).ForEach(func(s student) {
+		fmt.Printf("\t%s\n", s.String())
+	})
 	stream.Reset()
-	r2 := stream.Skip(5).Collect()
-	fmt.Printf("Limit: %v, skip: %v \n", r1, r2)
-}
-
-type sum struct {
-	value int
+	stream.Skip(5).Call(func() {
+		fmt.Println("\tskip by 5")
+	}).ForEach(func(s student) {
+		fmt.Printf("\t%s\n", s.String())
+	})
+	fmt.Println()
 }
 
 func TestReduce(t *testing.T) {
-	persons := newPersons()
-	stream, _ := New(persons)
+	fmt.Println(t.Name() + ": sum of scores[0]")
+	students := createStudents()
+	stream, _ := New(students)
 
 	r := 0
-	r = stream.Map(func(p person) int {
-		return p.age
+	r = stream.Map(func(s student) int {
+		return s.scores[0]
 	}).Reduce(r, func(sum int, i int) int {
 		return sum + i
 	}).(int)
-	fmt.Printf("reduce: %v \n", r)
+	fmt.Printf("\t%d\n", r)
 }
 
 func TestOf(t *testing.T) {
+	fmt.Print(t.Name() + ":  ")
 	stream, _ := Of(1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
-	r := int(0)
-	r = stream.Filter(func(i int) bool {
-		return i%2 == 0
-	}).Map(func(i int) int {
-		return i * 2
-	}).Reduce(r, func(sum int, i int) int {
-		return sum + i
+
+	stream.ForEach(func(i int) {
+		fmt.Printf("%d ", i)
+	})
+	fmt.Println()
+}
+
+func TestToSlice(t *testing.T) {
+	fmt.Print(t.Name() + ":  ")
+	stream, _ := Of(1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
+
+	slice := make([]int, 0)
+	stream.ToSlice(&slice)
+	fmt.Println(slice)
+	fmt.Println()
+}
+
+func TestPointer(t *testing.T) {
+	students := createStudents()
+	studentPs := make([]*student, len(students))
+	for i, s := range students {
+		studentPs[i] = &s
+	}
+	r := 0
+	stream, _ := New(studentPs)
+	r = stream.Filter(func(s *student) bool {
+		return s.age > 20
+	}).FlatMap(func(s *student) []*int {
+		intPs := make([]*int, len(s.scores))
+		for i, n := range s.scores {
+			intPs[i] = &n
+		}
+		return intPs
+	}).Reduce(r, func(sum int, i *int) int {
+		return sum + *i
 	}).(int)
-	fmt.Printf("test of: %d \n", r)
-}
-
-func TestInts(t *testing.T) {
-	stream, _ := Ints(1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
-	r := int64(0)
-	r = stream.Filter(func(i int64) bool {
-		return i%2 == 0
-	}).Map(func(i int64) int64 {
-		return i * 2
-	}).Reduce(r, func(sum int64, i int64) int64 {
-		return sum + i
-	}).(int64)
-	fmt.Printf("Ints: %d \n", r)
-}
-
-func TestFloats(t *testing.T) {
-	stream, _ := Floats(1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
-	r := float64(0.0)
-	r = stream.Filter(func(i float64) bool {
-		return i > 5
-	}).Map(func(i float64) float64 {
-		return i * 2
-	}).Reduce(r, func(sum float64, i float64) float64 {
-		return sum + i
-	}).(float64)
-	fmt.Printf("Floats: %f \n", r)
+	fmt.Println(r)
 }
