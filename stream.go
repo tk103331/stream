@@ -119,14 +119,6 @@ func (s *stream) FlatMap(mapFunc interface{}) *stream {
 	return s
 }
 
-// AggMap operation. Map many to one
-// aggFunc: func(o T) bool
-func (s *stream) AggMap(aggFunc interface{}) *stream {
-	funcValue := reflect.ValueOf(aggFunc)
-	s.ops = append(s.ops, op{typ: "aggMap", fun: funcValue})
-	return s
-}
-
 // Sort operation. lessFunc: func(o1,o2 T) bool
 func (s *stream) Sort(lessFunc interface{}) *stream {
 	funcValue := reflect.ValueOf(lessFunc)
@@ -184,8 +176,8 @@ func (s *stream) Skip(num int) *stream {
 	return s
 }
 
-// Collect operation.
-func (s *stream) Collect() []interface{} {
+// collect operation.
+func (s *stream) collect() []interface{} {
 	result := s.data
 	for _, op := range s.ops {
 		if len(result) == 0 {
@@ -269,12 +261,12 @@ func (s *stream) Collect() []interface{} {
 
 // Exec operation.
 func (s *stream) Exec() {
-	s.Collect()
+	s.collect()
 }
 
-// List operation.slice must be a pointer.
+// ToSlice operation. targetSlice must be a pointer.
 func (s *stream) ToSlice(targetSlice interface{}) error {
-	data := s.Collect()
+	data := s.collect()
 	targetValue := reflect.ValueOf(targetSlice)
 	if targetValue.Kind() != reflect.Ptr {
 		return errors.New("targetSlice must be a pointer!")
@@ -288,13 +280,13 @@ func (s *stream) ToSlice(targetSlice interface{}) error {
 
 // ForEach operation. actFunc: func(o T)
 func (s *stream) ForEach(actFunc interface{}) {
-	data := s.Collect()
+	data := s.collect()
 	each(data, reflect.ValueOf(actFunc), emptyeachfunc)
 }
 
 // AllMatch operation. matchFunc: func(o T) bool
 func (s *stream) AllMatch(matchFunc interface{}) bool {
-	data := s.Collect()
+	data := s.collect()
 	allMatch := true
 	each(data, reflect.ValueOf(matchFunc), func(i int, it interface{}, out []reflect.Value) bool {
 		if !out[0].Bool() {
@@ -308,7 +300,7 @@ func (s *stream) AllMatch(matchFunc interface{}) bool {
 
 // AnyMatch operation. matchFunc: func(o T) bool
 func (s *stream) AnyMatch(matchFunc interface{}) bool {
-	data := s.Collect()
+	data := s.collect()
 	anyMatch := false
 	each(data, reflect.ValueOf(matchFunc), func(i int, it interface{}, out []reflect.Value) bool {
 		if out[0].Bool() {
@@ -322,7 +314,7 @@ func (s *stream) AnyMatch(matchFunc interface{}) bool {
 
 // NoneMatch operation. matchFunc: func(o T) bool
 func (s *stream) NoneMatch(matchFunc interface{}) bool {
-	data := s.Collect()
+	data := s.collect()
 	noneMatch := true
 	each(data, reflect.ValueOf(matchFunc), func(i int, it interface{}, out []reflect.Value) bool {
 		if out[0].Bool() {
@@ -336,13 +328,13 @@ func (s *stream) NoneMatch(matchFunc interface{}) bool {
 
 // Count operation.Return the count of elements in stream.
 func (s *stream) Count() int {
-	return len(s.Collect())
+	return len(s.collect())
 }
 
 // Group operation. Group values by key.
 // Premeter groupFunc: func(o T1) (key T2,value T3). Return map[T2]T3
 func (s *stream) Group(groupFunc interface{}) interface{} {
-	data := s.Collect()
+	data := s.collect()
 	funcValue := reflect.ValueOf(groupFunc)
 	result := make(map[interface{}]interface{})
 	rValue := reflect.ValueOf(result)
@@ -361,7 +353,7 @@ func (s *stream) Group(groupFunc interface{}) interface{} {
 // Max operation.lessFunc: func(o1,o2 T) bool
 func (s *stream) Max(lessFunc interface{}) interface{} {
 	funcValue := reflect.ValueOf(lessFunc)
-	data := s.Collect()
+	data := s.collect()
 	var max interface{}
 	if len(data) > 0 {
 		max = data[0]
@@ -378,7 +370,7 @@ func (s *stream) Max(lessFunc interface{}) interface{} {
 // Min operation.lessFunc: func(o1,o2 T) bool
 func (s *stream) Min(lessFunc interface{}) interface{} {
 	funcValue := reflect.ValueOf(lessFunc)
-	data := s.Collect()
+	data := s.collect()
 	var min interface{}
 	if len(data) > 0 {
 		min = data[0]
@@ -394,7 +386,7 @@ func (s *stream) Min(lessFunc interface{}) interface{} {
 
 // First operation. matchFunc: func(o T) bool
 func (s *stream) First(matchFunc interface{}) interface{} {
-	data := s.Collect()
+	data := s.collect()
 	funcValue := reflect.ValueOf(matchFunc)
 	for _, it := range data {
 		out := call(funcValue, it)
@@ -407,7 +399,7 @@ func (s *stream) First(matchFunc interface{}) interface{} {
 
 // Last operation. matchFunc: func(o T) bool
 func (s *stream) Last(matchFunc interface{}) interface{} {
-	data := s.Collect()
+	data := s.collect()
 	funcValue := reflect.ValueOf(matchFunc)
 	for i := len(data) - 1; i >= 0; i-- {
 		it := data[i]
@@ -421,7 +413,7 @@ func (s *stream) Last(matchFunc interface{}) interface{} {
 
 // Reduce operation. reduceFunc: func(r T2,o T) T2
 func (s *stream) Reduce(initValue interface{}, reduceFunc interface{}) interface{} {
-	data := s.Collect()
+	data := s.collect()
 	funcValue := reflect.ValueOf(reduceFunc)
 	result := initValue
 	rValue := reflect.ValueOf(&result).Elem()

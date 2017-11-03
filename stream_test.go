@@ -114,11 +114,11 @@ func TestFlatMap(t *testing.T) {
 	fmt.Println(t.Name() + ": by scores")
 	students := createStudents()
 	stream, _ := New(students)
-
-	r := stream.FlatMap(func(s student) []int {
+	var data []int
+	stream.FlatMap(func(s student) []int {
 		return s.scores
-	}).Collect()
-	fmt.Printf("\t%v\n", r)
+	}).ToSlice(&data)
+	fmt.Printf("\t%v\n", data)
 }
 
 func TestSort(t *testing.T) {
