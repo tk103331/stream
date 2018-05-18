@@ -25,6 +25,7 @@ func (s sortbyfun) Len() int            { return len(s.data) }
 func (s *sortbyfun) Swap(i, j int)      { s.data[i], s.data[j] = s.data[j], s.data[i] }
 func (s *sortbyfun) Less(i, j int) bool { return call(s.fun, s.data[i], s.data[j])[0].Bool() }
 
+// New create a stream from a slice
 func New(arr interface{}) (*stream, error) {
 	ops := make([]op, 0)
 	data := make([]interface{}, 0)
@@ -43,18 +44,22 @@ func New(arr interface{}) (*stream, error) {
 	return &stream{ops: ops, data: data}, nil
 }
 
+// Of create a stream from some values
 func Of(args ...interface{}) (*stream, error) {
 	return New(args)
 }
 
+// Ints create a stream from some ints.
 func Ints(args ...int64) (*stream, error) {
 	return New(args)
 }
 
+// Floats create a stream from some floats.
 func Floats(args ...float64) (*stream, error) {
 	return New(args)
 }
 
+// Strings create a stream from some strings.
 func Strings(args ...string) (*stream, error) {
 	return New(args)
 }
@@ -269,7 +274,7 @@ func (s *stream) ToSlice(targetSlice interface{}) error {
 	data := s.collect()
 	targetValue := reflect.ValueOf(targetSlice)
 	if targetValue.Kind() != reflect.Ptr {
-		return errors.New("targetSlice must be a pointer!")
+		return errors.New("target slice must be a pointer")
 	}
 	sliceValue := reflect.Indirect(targetValue)
 	for _, it := range data {
