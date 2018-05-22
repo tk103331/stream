@@ -283,13 +283,15 @@ func (s *stream) ToSlice(targetSlice interface{}) error {
 	return nil
 }
 
-// ForEach operation. actFunc: func(o T)
+// ForEach executes a provided function once for each array element,and terminate the stream.
+// actFunc: func(o T)
 func (s *stream) ForEach(actFunc interface{}) {
 	data := s.collect()
 	each(data, reflect.ValueOf(actFunc), emptyeachfunc)
 }
 
-// AllMatch operation. matchFunc: func(o T) bool
+// AllMatch operation.
+// matchFunc: func(o T) bool
 func (s *stream) AllMatch(matchFunc interface{}) bool {
 	data := s.collect()
 	allMatch := true
