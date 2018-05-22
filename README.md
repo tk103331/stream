@@ -1,4 +1,6 @@
-# stream
+# stream 
+![](https://goreportcard.com/badge/github.com/tk103331/stream) [![GoDoc](https://godoc.org/github.com/tk103331/stream?status.svg)](https://godoc.org/github.com/tk103331/stream) 
+
 A Go language implementation of the Java Stream API.
 
 ----------

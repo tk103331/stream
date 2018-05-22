@@ -1,0 +1,14 @@
+language: go
+
+go:
+  - 1.8.x
+  - 1.9.x
+  - tip
+
+sudo: false
+
+install:
+  - export GOPATH=$HOME/gopath/src/github.com/tk103331/stream
+
+script:
+  - go test
