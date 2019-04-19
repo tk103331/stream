@@ -6,7 +6,7 @@ import (
 	"sort"
 )
 
-type stream struct {
+type Stream struct {
 	ops  []op
 	data []interface{}
 }
@@ -26,7 +26,7 @@ func (s *sortbyfun) Swap(i, j int)      { s.data[i], s.data[j] = s.data[j], s.da
 func (s *sortbyfun) Less(i, j int) bool { return call(s.fun, s.data[i], s.data[j])[0].Bool() }
 
 // New create a stream from a slice
-func New(arr interface{}) (*stream, error) {
+func New(arr interface{}) (*Stream, error) {
 	ops := make([]op, 0)
 	data := make([]interface{}, 0)
 	dataValue := reflect.ValueOf(&data).Elem()
@@ -41,31 +41,31 @@ func New(arr interface{}) (*stream, error) {
 	} else {
 		return nil, errors.New("the type of arr parameter must be Array or Slice")
 	}
-	return &stream{ops: ops, data: data}, nil
+	return &Stream{ops: ops, data: data}, nil
 }
 
 // Of create a stream from some values
-func Of(args ...interface{}) (*stream, error) {
+func Of(args ...interface{}) (*Stream, error) {
 	return New(args)
 }
 
 // Ints create a stream from some ints.
-func Ints(args ...int64) (*stream, error) {
+func Ints(args ...int64) (*Stream, error) {
 	return New(args)
 }
 
 // Floats create a stream from some floats.
-func Floats(args ...float64) (*stream, error) {
+func Floats(args ...float64) (*Stream, error) {
 	return New(args)
 }
 
 // Strings create a stream from some strings.
-func Strings(args ...string) (*stream, error) {
+func Strings(args ...string) (*Stream, error) {
 	return New(args)
 }
 
 // It create a stream from a iterator.itFunc: func(prev T) (next T,more bool)
-func It(initValue interface{}, itFunc interface{}) (*stream, error) {
+func It(initValue interface{}, itFunc interface{}) (*Stream, error) {
 	funcValue := reflect.ValueOf(itFunc)
 	data := make([]interface{}, 0)
 	dataValue := reflect.ValueOf(&data).Elem()
@@ -82,7 +82,7 @@ func It(initValue interface{}, itFunc interface{}) (*stream, error) {
 }
 
 // Gen create a stream by invoke genFunc. genFunc: func() (next T,more bool)
-func Gen(genFunc interface{}) (*stream, error) {
+func Gen(genFunc interface{}) (*Stream, error) {
 	funcValue := reflect.ValueOf(genFunc)
 	data := make([]interface{}, 0)
 	dataValue := reflect.ValueOf(&data).Elem()
@@ -96,13 +96,13 @@ func Gen(genFunc interface{}) (*stream, error) {
 	return New(data)
 }
 
-func (s *stream) Reset() *stream {
+func (s *Stream) Reset() *Stream {
 	s.ops = make([]op, 0)
 	return s
 }
 
 //  Filter operation. filterFunc: func(o T) bool
-func (s *stream) Filter(filterFunc interface{}) *stream {
+func (s *Stream) Filter(filterFunc interface{}) *Stream {
 	funcValue := reflect.ValueOf(filterFunc)
 	s.ops = append(s.ops, op{typ: "filter", fun: funcValue})
 	return s
@@ -110,7 +110,7 @@ func (s *stream) Filter(filterFunc interface{}) *stream {
 
 //  Map operation. Map one to one
 // mapFunc: func(o T1) T2
-func (s *stream) Map(mapFunc interface{}) *stream {
+func (s *Stream) Map(mapFunc interface{}) *Stream {
 	funcValue := reflect.ValueOf(mapFunc)
 	s.ops = append(s.ops, op{typ: "map", fun: funcValue})
 	return s
@@ -118,28 +118,28 @@ func (s *stream) Map(mapFunc interface{}) *stream {
 
 // FlatMap operation. Map one to many
 // mapFunc: func(o T1) []T2
-func (s *stream) FlatMap(mapFunc interface{}) *stream {
+func (s *Stream) FlatMap(mapFunc interface{}) *Stream {
 	funcValue := reflect.ValueOf(mapFunc)
 	s.ops = append(s.ops, op{typ: "flatMap", fun: funcValue})
 	return s
 }
 
 // Sort operation. lessFunc: func(o1,o2 T) bool
-func (s *stream) Sort(lessFunc interface{}) *stream {
+func (s *Stream) Sort(lessFunc interface{}) *Stream {
 	funcValue := reflect.ValueOf(lessFunc)
 	s.ops = append(s.ops, op{typ: "sort", fun: funcValue})
 	return s
 }
 
 // Distinct operation. equalFunc: func(o1,o2 T) bool
-func (s *stream) Distinct(equalFunc interface{}) *stream {
+func (s *Stream) Distinct(equalFunc interface{}) *Stream {
 	funcValue := reflect.ValueOf(equalFunc)
 	s.ops = append(s.ops, op{typ: "distinct", fun: funcValue})
 	return s
 }
 
 // Peek operation. peekFunc: func(o T)
-func (s *stream) Peek(peekFunc interface{}) *stream {
+func (s *Stream) Peek(peekFunc interface{}) *Stream {
 	funcValue := reflect.ValueOf(peekFunc)
 	s.ops = append(s.ops, op{typ: "peek", fun: funcValue})
 	return s
@@ -147,7 +147,7 @@ func (s *stream) Peek(peekFunc interface{}) *stream {
 
 // Call operation. Call function with the data.
 // callFunc: func()
-func (s *stream) Call(callFunc interface{}) *stream {
+func (s *Stream) Call(callFunc interface{}) *Stream {
 	funcValue := reflect.ValueOf(callFunc)
 	s.ops = append(s.ops, op{typ: "call", fun: funcValue})
 	return s
@@ -155,14 +155,14 @@ func (s *stream) Call(callFunc interface{}) *stream {
 
 // Check operation. Check if should be continue process data.
 // checkFunc: func(o []T) bool ,checkFunc must return if should be continue process data.
-func (s *stream) Check(checkFunc interface{}) *stream {
+func (s *Stream) Check(checkFunc interface{}) *Stream {
 	funcValue := reflect.ValueOf(checkFunc)
 	s.ops = append(s.ops, op{typ: "check", fun: funcValue})
 	return s
 }
 
 // Limit operation.
-func (s *stream) Limit(num int) *stream {
+func (s *Stream) Limit(num int) *Stream {
 	if num < 0 {
 		num = 0
 	}
@@ -172,7 +172,7 @@ func (s *stream) Limit(num int) *stream {
 }
 
 // Skip operation.
-func (s *stream) Skip(num int) *stream {
+func (s *Stream) Skip(num int) *Stream {
 	if num < 0 {
 		num = 0
 	}
@@ -182,7 +182,7 @@ func (s *stream) Skip(num int) *stream {
 }
 
 // collect operation.
-func (s *stream) collect() []interface{} {
+func (s *Stream) collect() []interface{} {
 	result := s.data
 	for _, op := range s.ops {
 		if len(result) == 0 {
@@ -265,12 +265,12 @@ func (s *stream) collect() []interface{} {
 }
 
 // Exec operation.
-func (s *stream) Exec() {
+func (s *Stream) Exec() {
 	s.collect()
 }
 
 // ToSlice operation. targetSlice must be a pointer.
-func (s *stream) ToSlice(targetSlice interface{}) error {
+func (s *Stream) ToSlice(targetSlice interface{}) error {
 	data := s.collect()
 	targetValue := reflect.ValueOf(targetSlice)
 	if targetValue.Kind() != reflect.Ptr {
@@ -285,14 +285,14 @@ func (s *stream) ToSlice(targetSlice interface{}) error {
 
 // ForEach executes a provided function once for each array element,and terminate the stream.
 // actFunc: func(o T)
-func (s *stream) ForEach(actFunc interface{}) {
+func (s *Stream) ForEach(actFunc interface{}) {
 	data := s.collect()
 	each(data, reflect.ValueOf(actFunc), emptyeachfunc)
 }
 
 // AllMatch operation.
 // matchFunc: func(o T) bool
-func (s *stream) AllMatch(matchFunc interface{}) bool {
+func (s *Stream) AllMatch(matchFunc interface{}) bool {
 	data := s.collect()
 	allMatch := true
 	each(data, reflect.ValueOf(matchFunc), func(i int, it interface{}, out []reflect.Value) bool {
@@ -306,7 +306,7 @@ func (s *stream) AllMatch(matchFunc interface{}) bool {
 }
 
 // AnyMatch operation. matchFunc: func(o T) bool
-func (s *stream) AnyMatch(matchFunc interface{}) bool {
+func (s *Stream) AnyMatch(matchFunc interface{}) bool {
 	data := s.collect()
 	anyMatch := false
 	each(data, reflect.ValueOf(matchFunc), func(i int, it interface{}, out []reflect.Value) bool {
@@ -320,7 +320,7 @@ func (s *stream) AnyMatch(matchFunc interface{}) bool {
 }
 
 // NoneMatch operation. matchFunc: func(o T) bool
-func (s *stream) NoneMatch(matchFunc interface{}) bool {
+func (s *Stream) NoneMatch(matchFunc interface{}) bool {
 	data := s.collect()
 	noneMatch := true
 	each(data, reflect.ValueOf(matchFunc), func(i int, it interface{}, out []reflect.Value) bool {
@@ -334,13 +334,13 @@ func (s *stream) NoneMatch(matchFunc interface{}) bool {
 }
 
 // Count operation.Return the count of elements in stream.
-func (s *stream) Count() int {
+func (s *Stream) Count() int {
 	return len(s.collect())
 }
 
 // Group operation. Group values by key.
 // Premeter groupFunc: func(o T1) (key T2,value T3). Return map[T2]T3
-func (s *stream) Group(groupFunc interface{}) interface{} {
+func (s *Stream) Group(groupFunc interface{}) interface{} {
 	data := s.collect()
 	funcValue := reflect.ValueOf(groupFunc)
 	result := make(map[interface{}]interface{})
@@ -358,7 +358,7 @@ func (s *stream) Group(groupFunc interface{}) interface{} {
 }
 
 // Max operation.lessFunc: func(o1,o2 T) bool
-func (s *stream) Max(lessFunc interface{}) interface{} {
+func (s *Stream) Max(lessFunc interface{}) interface{} {
 	funcValue := reflect.ValueOf(lessFunc)
 	data := s.collect()
 	var max interface{}
@@ -375,7 +375,7 @@ func (s *stream) Max(lessFunc interface{}) interface{} {
 }
 
 // Min operation.lessFunc: func(o1,o2 T) bool
-func (s *stream) Min(lessFunc interface{}) interface{} {
+func (s *Stream) Min(lessFunc interface{}) interface{} {
 	funcValue := reflect.ValueOf(lessFunc)
 	data := s.collect()
 	var min interface{}
@@ -392,7 +392,7 @@ func (s *stream) Min(lessFunc interface{}) interface{} {
 }
 
 // First operation. matchFunc: func(o T) bool
-func (s *stream) First(matchFunc interface{}) interface{} {
+func (s *Stream) First(matchFunc interface{}) interface{} {
 	data := s.collect()
 	funcValue := reflect.ValueOf(matchFunc)
 	for _, it := range data {
@@ -405,7 +405,7 @@ func (s *stream) First(matchFunc interface{}) interface{} {
 }
 
 // Last operation. matchFunc: func(o T) bool
-func (s *stream) Last(matchFunc interface{}) interface{} {
+func (s *Stream) Last(matchFunc interface{}) interface{} {
 	data := s.collect()
 	funcValue := reflect.ValueOf(matchFunc)
 	for i := len(data) - 1; i >= 0; i-- {
@@ -419,7 +419,7 @@ func (s *stream) Last(matchFunc interface{}) interface{} {
 }
 
 // Reduce operation. reduceFunc: func(r T2,o T) T2
-func (s *stream) Reduce(initValue interface{}, reduceFunc interface{}) interface{} {
+func (s *Stream) Reduce(initValue interface{}, reduceFunc interface{}) interface{} {
 	data := s.collect()
 	funcValue := reflect.ValueOf(reduceFunc)
 	result := initValue
