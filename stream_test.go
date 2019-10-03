@@ -1,7 +1,8 @@
-package stream
+package stream_test
 
 import (
 	"fmt"
+	"github.com/guoapeng/stream"
 	"math/rand"
 	"testing"
 )
@@ -49,7 +50,7 @@ func createNodes() *node {
 
 func TestNew(t *testing.T) {
 	students := createStudents()
-	stream, _ := New(students)
+	stream, _ := stream.New(students)
 
 	fmt.Println(t.Name() + ":")
 	stream.ForEach(func(s student) {
@@ -62,7 +63,7 @@ func TestIterate(t *testing.T) {
 	root := createNodes()
 
 	fmt.Println(t.Name() + ":")
-	stream, _ := It(root, func(n *node) (*node, bool) {
+	stream, _ := stream.It(root, func(n *node) (*node, bool) {
 		return n.next, n.next.next != nil
 	})
 	stream.ForEach(func(n *node) {
@@ -73,7 +74,7 @@ func TestIterate(t *testing.T) {
 
 func TestGenerate(t *testing.T) {
 	fmt.Println(t.Name() + ":")
-	stream, _ := Gen(func() (int, bool) {
+	stream, _ := stream.Gen(func() (int, bool) {
 		x := rand.Intn(10)
 		return x, x < 8
 	})
@@ -87,7 +88,7 @@ func TestFilter(t *testing.T) {
 	fmt.Println(t.Name() + ": by age > 20")
 
 	students := createStudents()
-	stream, _ := New(students)
+	stream, _ := stream.New(students)
 
 	stream.Filter(func(s student) bool {
 		return s.age > 20
@@ -100,7 +101,7 @@ func TestFilter(t *testing.T) {
 func TestMap(t *testing.T) {
 	fmt.Println(t.Name() + ": by name")
 	students := createStudents()
-	stream, _ := New(students)
+	stream, _ := stream.New(students)
 
 	stream.Map(func(s student) string {
 		return s.name
@@ -113,7 +114,7 @@ func TestMap(t *testing.T) {
 func TestFlatMap(t *testing.T) {
 	fmt.Println(t.Name() + ": by scores")
 	students := createStudents()
-	stream, _ := New(students)
+	stream, _ := stream.New(students)
 	var data []int
 	stream.FlatMap(func(s student) []int {
 		return s.scores
@@ -124,7 +125,7 @@ func TestFlatMap(t *testing.T) {
 func TestSort(t *testing.T) {
 	fmt.Println(t.Name() + ": by scores desc")
 	students := createStudents()
-	stream, _ := New(students)
+	stream, _ := stream.New(students)
 
 	stream.Sort(func(s1, s2 student) bool {
 		return s1.scores[0]+s1.scores[1]+s1.scores[2] > s2.scores[0]+s2.scores[1]+s2.scores[2]
@@ -137,7 +138,7 @@ func TestSort(t *testing.T) {
 func TestDistinct(t *testing.T) {
 	fmt.Println(t.Name() + ": by name")
 	students := createStudents()
-	stream, _ := New(students)
+	stream, _ := stream.New(students)
 
 	stream.Map(func(s student) string {
 		return s.name
@@ -152,7 +153,7 @@ func TestDistinct(t *testing.T) {
 func TestForEach(t *testing.T) {
 	fmt.Println(t.Name() + ": by name")
 	students := createStudents()
-	stream, _ := New(students)
+	stream, _ := stream.New(students)
 
 	stream.ForEach(func(s student) {
 		fmt.Printf("\t%s\n", s.String())
@@ -163,7 +164,7 @@ func TestForEach(t *testing.T) {
 func TestMatch(t *testing.T) {
 	fmt.Println(t.Name() + ":")
 	students := createStudents()
-	stream, _ := New(students)
+	stream, _ := stream.New(students)
 
 	r1 := stream.AllMatch(func(s student) bool {
 		return s.age > 20
@@ -182,7 +183,7 @@ func TestMatch(t *testing.T) {
 func TestCount(t *testing.T) {
 	fmt.Println(t.Name() + ":")
 	students := createStudents()
-	stream, _ := New(students)
+	stream, _ := stream.New(students)
 
 	r := stream.Count()
 	fmt.Printf("\t%d\n", r)
@@ -191,7 +192,7 @@ func TestCount(t *testing.T) {
 func TestMaxMin(t *testing.T) {
 	fmt.Println(t.Name() + ": by scores")
 	students := createStudents()
-	stream, _ := New(students)
+	stream, _ := stream.New(students)
 
 	r1 := stream.Max(func(s1, s2 student) bool {
 		return s1.scores[0]+s1.scores[1]+s1.scores[2] < s2.scores[0]+s2.scores[1]+s2.scores[2]
@@ -206,7 +207,7 @@ func TestMaxMin(t *testing.T) {
 func TestPeek(t *testing.T) {
 	fmt.Println(t.Name() + ":")
 	students := createStudents()
-	stream, _ := New(students)
+	stream, _ := stream.New(students)
 
 	stream.Filter(func(s student) bool {
 		return s.age%2 == 0
@@ -226,7 +227,7 @@ func TestPeek(t *testing.T) {
 func TestLimitSkip(t *testing.T) {
 	fmt.Println(t.Name() + ":")
 	students := createStudents()
-	stream, _ := New(students)
+	stream, _ := stream.New(students)
 
 	stream.Limit(5).Call(func() {
 		fmt.Println("\tlimit by 5")
@@ -245,7 +246,7 @@ func TestLimitSkip(t *testing.T) {
 func TestReduce(t *testing.T) {
 	fmt.Println(t.Name() + ": sum of scores[0]")
 	students := createStudents()
-	stream, _ := New(students)
+	stream, _ := stream.New(students)
 
 	r := 0
 	r = stream.Map(func(s student) int {
@@ -258,7 +259,7 @@ func TestReduce(t *testing.T) {
 
 func TestOf(t *testing.T) {
 	fmt.Print(t.Name() + ":  ")
-	stream, _ := Of(1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
+	stream, _ := stream.Of(1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
 
 	stream.ForEach(func(i int) {
 		fmt.Printf("%d ", i)
@@ -268,7 +269,7 @@ func TestOf(t *testing.T) {
 
 func TestToSlice(t *testing.T) {
 	fmt.Print(t.Name() + ":  ")
-	stream, _ := Of(1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
+	stream, _ := stream.Of(1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
 
 	slice := make([]int, 0)
 	stream.ToSlice(&slice)
@@ -283,7 +284,7 @@ func TestPointer(t *testing.T) {
 		studentPs[i] = &s
 	}
 	r := 0
-	stream, _ := New(studentPs)
+	stream, _ := stream.New(studentPs)
 	r = stream.Filter(func(s *student) bool {
 		return s.age > 20
 	}).FlatMap(func(s *student) []*int {
