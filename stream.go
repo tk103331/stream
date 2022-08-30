@@ -101,14 +101,14 @@ func (s *Stream) Reset() *Stream {
 	return s
 }
 
-//  Filter operation. filterFunc: func(o T) bool
+// Filter operation. filterFunc: func(o T) bool
 func (s *Stream) Filter(filterFunc interface{}) *Stream {
 	funcValue := reflect.ValueOf(filterFunc)
 	s.ops = append(s.ops, op{typ: "filter", fun: funcValue})
 	return s
 }
 
-//  Map operation. Map one to one
+// Map operation. Map one to one
 // mapFunc: func(o T1) T2
 func (s *Stream) Map(mapFunc interface{}) *Stream {
 	funcValue := reflect.ValueOf(mapFunc)
