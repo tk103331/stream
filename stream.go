@@ -431,10 +431,10 @@ func (s *Stream) Reduce(initValue interface{}, reduceFunc interface{}) interface
 	return result
 }
 
-//  eachfunc is the function for each method,return if should continue loop
+// eachfunc is the function for each method,return if should continue loop
 type eachfunc func(int, interface{}, []reflect.Value) bool
 
-//  emptyeachfunc the empty eachfunc, return true
+// emptyeachfunc the empty eachfunc, return true
 var emptyeachfunc = func(int, interface{}, []reflect.Value) bool { return true }
 
 func each(data []interface{}, fun reflect.Value, act eachfunc) {
