@@ -446,7 +446,6 @@ func each(data []interface{}, fun reflect.Value, act eachfunc) {
 	}
 }
 
-
 func call(fun reflect.Value, args ...interface{}) []reflect.Value {
 	in := make([]reflect.Value, len(args))
 	for i, a := range args {
