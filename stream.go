@@ -16,14 +16,14 @@ type op struct {
 	fun reflect.Value
 }
 
-type sortbyfun struct {
+type FuncSorter struct {
 	data []interface{}
 	fun  reflect.Value
 }
 
-func (s sortbyfun) Len() int            { return len(s.data) }
-func (s *sortbyfun) Swap(i, j int)      { s.data[i], s.data[j] = s.data[j], s.data[i] }
-func (s *sortbyfun) Less(i, j int) bool { return call(s.fun, s.data[i], s.data[j])[0].Bool() }
+func (s FuncSorter) Len() int            { return len(s.data) }
+func (s *FuncSorter) Swap(i, j int)      { s.data[i], s.data[j] = s.data[j], s.data[i] }
+func (s *FuncSorter) Less(i, j int) bool { return call(s.fun, s.data[i], s.data[j])[0].Bool() }
 
 // New create a stream from a slice
 func New(arr interface{}) (*Stream, error) {
@@ -49,22 +49,22 @@ func Of(args ...interface{}) (*Stream, error) {
 	return New(args)
 }
 
-// Ints create a stream from some ints.
+// Ints create a stream from some int64 values.
 func Ints(args ...int64) (*Stream, error) {
 	return New(args)
 }
 
-// Floats create a stream from some floats.
+// Floats create a stream from some float64 values.
 func Floats(args ...float64) (*Stream, error) {
 	return New(args)
 }
 
-// Strings create a stream from some strings.
+// Strings create a stream from some string values.
 func Strings(args ...string) (*Stream, error) {
 	return New(args)
 }
 
-// It create a stream from a iterator.itFunc: func(prev T) (next T,more bool)
+// It create a stream from an iterator. itFunc: func(prev T) (next T,more bool).
 func It(initValue interface{}, itFunc interface{}) (*Stream, error) {
 	funcValue := reflect.ValueOf(itFunc)
 	data := make([]interface{}, 0)
@@ -190,68 +190,23 @@ func (s *Stream) collect() []interface{} {
 		}
 		switch op.typ {
 		case "filter":
-			temp := make([]interface{}, 0)
-			each(result, op.fun, func(i int, it interface{}, out []reflect.Value) bool {
-				if out[0].Bool() {
-					temp = append(temp, it)
-				}
-				return true
-			})
-			result = temp
+			result = doFilter(result, op)
 		case "peek":
 			each(result, op.fun, emptyeachfunc)
 		case "map":
-			temp := make([]interface{}, 0)
-			tempVlaue := reflect.ValueOf(&temp).Elem()
-			each(result, op.fun, func(i int, it interface{}, out []reflect.Value) bool {
-				tempVlaue.Set(reflect.Append(tempVlaue, out[0]))
-				return true
-			})
-			result = temp
+			result = doMap(result, op)
 		case "flatMap":
-			temp := make([]interface{}, 0)
-			tempVlaue := reflect.ValueOf(&temp).Elem()
-			each(result, op.fun, func(i int, it interface{}, out []reflect.Value) bool {
-				for i := 0; i < out[0].Len(); i++ {
-					tempVlaue.Set(reflect.Append(tempVlaue, out[0].Index(i)))
-				}
-				return true
-			})
-			result = temp
+			result = doFlatMap(result, op)
 		case "aggMap":
 
 		case "sort":
-			sort.Sort(&sortbyfun{data: result, fun: op.fun})
+			sort.Sort(&FuncSorter{data: result, fun: op.fun})
 		case "distinct":
-			temp := make([]interface{}, 0)
-			temp = append(temp, result[0])
-			for _, it := range result {
-				found := false
-				for _, it2 := range temp {
-					out := call(op.fun, it, it2)
-					if out[0].Bool() {
-						found = true
-					}
-				}
-				if !found {
-					temp = append(temp, it)
-				}
-			}
-			result = temp
+			result = doDistinct(result, op)
 		case "limit":
-			limit := int(call(op.fun)[0].Int())
-			if limit > len(result) {
-				limit = len(result)
-			}
-			temp := result
-			result = temp[:limit]
+			result = doLimit(op, result)
 		case "skip":
-			skip := int(call(op.fun)[0].Int())
-			if skip > len(result) {
-				skip = len(result)
-			}
-			temp := result
-			result = temp[skip:]
+			result = doSkip(op, result)
 		case "call":
 			call(op.fun)
 		case "check":
@@ -262,6 +217,75 @@ func (s *Stream) collect() []interface{} {
 		}
 	}
 	return result
+}
+
+func doSkip(op op, result []interface{}) []interface{} {
+	skip := int(call(op.fun)[0].Int())
+	if skip > len(result) {
+		skip = len(result)
+	}
+	temp := result
+	return temp[skip:]
+}
+
+func doLimit(op op, result []interface{}) []interface{} {
+	limit := int(call(op.fun)[0].Int())
+	if limit > len(result) {
+		limit = len(result)
+	}
+	temp := result
+	return temp[:limit]
+}
+
+func doDistinct(result []interface{}, op op) []interface{} {
+	temp := make([]interface{}, 0)
+	temp = append(temp, result[0])
+	for _, it := range result {
+		found := false
+		for _, it2 := range temp {
+			out := call(op.fun, it, it2)
+			if out[0].Bool() {
+				found = true
+			}
+		}
+		if !found {
+			temp = append(temp, it)
+		}
+	}
+	return temp
+}
+
+func doFlatMap(result []interface{}, op op) []interface{} {
+	temp := make([]interface{}, 0)
+	tempVlaue := reflect.ValueOf(&temp).Elem()
+	each(result, op.fun, func(i int, it interface{}, out []reflect.Value) bool {
+		for i := 0; i < out[0].Len(); i++ {
+			tempVlaue.Set(reflect.Append(tempVlaue, out[0].Index(i)))
+		}
+		return true
+	})
+	return temp
+}
+
+func doMap(result []interface{}, op op) []interface{} {
+	temp := make([]interface{}, 0)
+	tempValue := reflect.ValueOf(&temp).Elem()
+	each(result, op.fun, func(i int, it interface{}, out []reflect.Value) bool {
+		tempValue.Set(reflect.Append(tempValue, out[0]))
+		return true
+	})
+	return temp
+}
+
+func doFilter(result []interface{}, op op) []interface{} {
+	temp := make([]interface{}, 0)
+	each(result, op.fun, func(i int, it interface{}, out []reflect.Value) bool {
+		if out[0].Bool() {
+			temp = append(temp, it)
+		}
+		return true
+	})
+	return temp
 }
 
 // Exec operation.
