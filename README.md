@@ -1,6 +1,7 @@
 # stream 
 
 [![Travis CI](https://travis-ci.org/tk103331/stream.svg?branch=master)](https://app.travis-ci.com/github/tk103331/stream)
+[![Coverage Status](https://coveralls.io/repos/github/tk103331/stream/badge.svg?branch=master)](https://coveralls.io/github/tk103331/stream?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/tk103331/stream?_t=0)](https://goreportcard.com/report/github.com/tk103331/stream)
 [![Go Reference](https://pkg.go.dev/badge/github.com/tk103331/stream.svg)](https://pkg.go.dev/github.com/tk103331/stream)
 ![GitHub repo size](https://img.shields.io/github/repo-size/tk103331/stream)
