@@ -1,12 +1,11 @@
 language: go
-
 go:
-  - 1.8.x
-
-sudo: false
-
-install:
-  - export GOPATH=$HOME/gopath/src/github.com/tk103331/stream
-
+  - 1.18.x
+before_install:
+  - export GO111MODULE=on
+  - export GOPROXY=https://proxy.golang.com.cn,direct
+  - go get golang.org/x/tools/cmd/cover
+  - go install github.com/mattn/goveralls@latest
 script:
-  - go test
+  - go test -v -covermode=count -coverprofile=coverage.out
+  - $GOPATH/bin/goveralls -coverprofile=coverage.out -service=travis-ci
