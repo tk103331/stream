@@ -363,22 +363,22 @@ func (s *Stream) Count() int {
 }
 
 // Group operation. Group values by key.
-// Premeter groupFunc: func(o T1) (key T2,value T3). Return map[T2]T3
-func (s *Stream) Group(groupFunc interface{}) interface{} {
+// Parameter groupFunc: func(o T1) (key T2,value T3). Return map[T2]T3
+func (s *Stream) Group(groupFunc interface{}) map[interface{}][]interface{} {
 	data := s.collect()
 	funcValue := reflect.ValueOf(groupFunc)
-	result := make(map[interface{}]interface{})
-	rValue := reflect.ValueOf(result)
+	result := make(map[interface{}][]interface{})
 	for _, it := range data {
 		out := call(funcValue, it)
-		sliceValue := rValue.MapIndex(out[0])
-		if sliceValue.IsNil() || !sliceValue.IsValid() {
-			sliceValue = reflect.ValueOf(make([]interface{}, 0))
+		key := out[0].Interface()
+		slice, ok := result[key]
+		if !ok {
+			slice = make([]interface{}, 1)
 		}
-		sliceValue.Set(reflect.Append(sliceValue, out[1]))
-		rValue.SetMapIndex(out[0], sliceValue)
+		slice = append(slice, out[1].Interface())
+		result[key] = slice
 	}
-	return s
+	return result
 }
 
 // Max operation.lessFunc: func(o1,o2 T) bool

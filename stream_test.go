@@ -58,6 +58,39 @@ func TestNew(t *testing.T) {
 	fmt.Println()
 }
 
+func TestNewP(t *testing.T) {
+	students := createStudents()
+	_, err := New(&students)
+	fmt.Println(err)
+}
+
+func TestNewErr(t *testing.T) {
+
+	_, err := New(1)
+	fmt.Println(err)
+}
+
+func TestInts(t *testing.T) {
+	ints, _ := Ints(1, 2, 3)
+	ints.ForEach(func(i int64) {
+		fmt.Print(i)
+	})
+}
+
+func TestFloats(t *testing.T) {
+	floats, _ := Floats(1.1, 2.2, 3.3)
+	floats.ForEach(func(f float64) {
+		fmt.Print(f)
+	})
+}
+
+func TestStrings(t *testing.T) {
+	strs, _ := Strings("a", "b", "c")
+	strs.ForEach(func(s string) {
+		fmt.Print(s)
+	})
+}
+
 func TestIterate(t *testing.T) {
 	root := createNodes()
 
@@ -223,6 +256,19 @@ func TestPeek(t *testing.T) {
 	}).Exec()
 }
 
+func TestCheck(t *testing.T) {
+	fmt.Println(t.Name() + ":")
+	students := createStudents()
+	stream, _ := New(students)
+	stream.Filter(func(s student) bool {
+		return s.age%2 == 0
+	}).Check(func(sts []interface{}) bool {
+		return len(sts) > 2
+	}).ForEach(func(s student) {
+		fmt.Println(s.String())
+	})
+}
+
 func TestLimitSkip(t *testing.T) {
 	fmt.Println(t.Name() + ":")
 	students := createStudents()
@@ -235,6 +281,25 @@ func TestLimitSkip(t *testing.T) {
 	})
 	stream.Reset()
 	stream.Skip(5).Call(func() {
+		fmt.Println("\tskip by 5")
+	}).ForEach(func(s student) {
+		fmt.Printf("\t%s\n", s.String())
+	})
+	fmt.Println()
+}
+
+func TestLimitSkipNeg(t *testing.T) {
+	fmt.Println(t.Name() + ":")
+	students := createStudents()
+	stream, _ := New(students)
+
+	stream.Limit(-1).Call(func() {
+		fmt.Println("\tlimit by 5")
+	}).ForEach(func(s student) {
+		fmt.Printf("\t%s\n", s.String())
+	})
+	stream.Reset()
+	stream.Skip(-1).Call(func() {
 		fmt.Println("\tskip by 5")
 	}).ForEach(func(s student) {
 		fmt.Printf("\t%s\n", s.String())
@@ -296,4 +361,30 @@ func TestPointer(t *testing.T) {
 		return sum + *i
 	}).(int)
 	fmt.Println(r)
+}
+
+func TestGroup(t *testing.T) {
+	students := createStudents()
+	stream, _ := New(students)
+
+	group := stream.Group(func(s student) (int, student) {
+		return s.age, s
+	})
+	fmt.Println(group)
+}
+
+func TestFirstLast(t *testing.T) {
+	students := createStudents()
+	stream, _ := New(students)
+
+	first := stream.First(func(s student) bool {
+		return s.age > 18
+	})
+	fmt.Println(first)
+
+	stream, _ = New(students)
+	last := stream.Last(func(s student) bool {
+		return s.age > 18
+	})
+	fmt.Println(last)
 }
