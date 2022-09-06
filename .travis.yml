@@ -8,4 +8,4 @@ before_install:
   - go get github.com/mattn/goveralls
 script:
   - go test -v -covermode=count -coverprofile=coverage.out
-  - $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci
+  - goveralls -coverprofile=coverage.out -service=travis-ci
