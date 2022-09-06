@@ -1,6 +1,6 @@
 language: go
 go:
-  - 1.11.x
+  - 1.18.x
 before_install:
   - export GO111MODULE=on
   - export GOPROXY=https://proxy.golang.com.cn,direct
