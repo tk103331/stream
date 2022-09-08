@@ -3,6 +3,8 @@ package stream
 import (
 	"fmt"
 	"math/rand"
+	"reflect"
+	"strconv"
 	"testing"
 )
 
@@ -116,6 +118,17 @@ func TestGenerate(t *testing.T) {
 	fmt.Println()
 }
 
+func TestGenerateN(t *testing.T) {
+	fmt.Println(t.Name() + ":")
+	stream, _ := GenN(3, func(idx int) int {
+		return idx * 2
+	})
+	stream.ForEach(func(x int) {
+		fmt.Printf("\t%d\n", x)
+	})
+	fmt.Println()
+}
+
 func TestFilter(t *testing.T) {
 	fmt.Println(t.Name() + ": by age > 20")
 
@@ -124,6 +137,20 @@ func TestFilter(t *testing.T) {
 
 	stream.Filter(func(s student) bool {
 		return s.age > 20
+	}).ForEach(func(s student) {
+		fmt.Printf("\t%s\n", s.String())
+	})
+	fmt.Printf("\n")
+}
+
+func TestFilterIndex(t *testing.T) {
+	fmt.Println(t.Name() + ": by age > 20")
+
+	students := createStudents()
+	stream, _ := New(students)
+
+	stream.FilterIndex(func(s student, i int) bool {
+		return s.age > 20 && i%2 == 0
 	}).ForEach(func(s student) {
 		fmt.Printf("\t%s\n", s.String())
 	})
@@ -143,12 +170,36 @@ func TestMap(t *testing.T) {
 	fmt.Println()
 }
 
+func TestMapIndex(t *testing.T) {
+	fmt.Println(t.Name() + ": by name")
+	students := createStudents()
+	stream, _ := New(students)
+
+	stream.MapIndex(func(s student, i int) string {
+		return strconv.Itoa(i) + ":" + s.name
+	}).ForEach(func(s string) {
+		fmt.Printf("\t%s\n", s)
+	})
+	fmt.Println()
+}
+
 func TestFlatMap(t *testing.T) {
 	fmt.Println(t.Name() + ": by scores")
 	students := createStudents()
 	stream, _ := New(students)
 	var data []int
 	stream.FlatMap(func(s student) []int {
+		return s.scores
+	}).ToSlice(&data)
+	fmt.Printf("\t%v\n", data)
+}
+
+func TestFlatMapIndex(t *testing.T) {
+	fmt.Println(t.Name() + ": by scores")
+	students := createStudents()
+	stream, _ := New(students)
+	var data []int
+	stream.FlatMapIndex(func(s student, idx int) []int {
 		return s.scores
 	}).ToSlice(&data)
 	fmt.Printf("\t%v\n", data)
@@ -193,6 +244,17 @@ func TestForEach(t *testing.T) {
 	fmt.Println()
 }
 
+func TestForEachIndex(t *testing.T) {
+	fmt.Println(t.Name() + ": by name")
+	students := createStudents()
+	stream, _ := New(students)
+
+	stream.ForEachIndex(func(s student, i int) {
+		fmt.Printf("\t%d : %s\n", i, s.String())
+	})
+	fmt.Println()
+}
+
 func TestMatch(t *testing.T) {
 	fmt.Println(t.Name() + ":")
 	students := createStudents()
@@ -202,14 +264,24 @@ func TestMatch(t *testing.T) {
 		return s.age > 20
 	})
 	stream.Reset()
+	r11 := stream.AllMatchIndex(func(s student, i int) bool {
+		return s.age > 20 && i%2 == 0
+	})
+	stream.Reset()
 	r2 := stream.AnyMatch(func(s student) bool {
 		return s.name == "Jim"
+	})
+	r22 := stream.AnyMatchIndex(func(s student, i int) bool {
+		return s.name == "Jim" && i%2 == 0
 	})
 	stream.Reset()
 	r3 := stream.NoneMatch(func(s student) bool {
 		return s.scores[0]+s.scores[1]+s.scores[2] > 270
 	})
-	fmt.Printf("\tAllMatch: %t, AnyMatch: %t, NoneMatch: %t \n", r1, r2, r3)
+	r33 := stream.NoneMatchIndex(func(s student, i int) bool {
+		return s.scores[0]+s.scores[1]+s.scores[2] > 270 && i%2 == 0
+	})
+	fmt.Printf("\tAllMatch: %t %t, AnyMatch: %t %t, NoneMatch: %t %t \n", r1, r11, r2, r22, r3, r33)
 }
 
 func TestCount(t *testing.T) {
@@ -252,6 +324,26 @@ func TestPeek(t *testing.T) {
 	}).Call(func() {
 		fmt.Println("\tfilter by age > 18")
 	}).Peek(func(s student) {
+		fmt.Printf("\t%s\n", s.String())
+	}).Exec()
+}
+
+func TestPeekIndex(t *testing.T) {
+	fmt.Println(t.Name() + ":")
+	students := createStudents()
+	stream, _ := New(students)
+
+	stream.FilterIndex(func(s student, i int) bool {
+		return s.age%2 == 0
+	}).Call(func() {
+		fmt.Println("\tfilter by age % 2 == 0")
+	}).PeekIndex(func(s student, i int) {
+		fmt.Printf("\t%s\n", s.String())
+	}).FilterIndex(func(s student, i int) bool {
+		return s.age > 18
+	}).Call(func() {
+		fmt.Println("\tfilter by age > 18")
+	}).PeekIndex(func(s student, i int) {
 		fmt.Printf("\t%s\n", s.String())
 	}).Exec()
 }
@@ -321,6 +413,20 @@ func TestReduce(t *testing.T) {
 	fmt.Printf("\t%d\n", r)
 }
 
+func TestReduceIndex(t *testing.T) {
+	fmt.Println(t.Name() + ": sum of scores[0]")
+	students := createStudents()
+	stream, _ := New(students)
+
+	r := 0
+	r = stream.Map(func(s student) int {
+		return s.scores[0]
+	}).ReduceIndex(r, func(sum int, o int, i int) int {
+		return sum + o
+	}).(int)
+	fmt.Printf("\t%d\n", r)
+}
+
 func TestOf(t *testing.T) {
 	fmt.Print(t.Name() + ":  ")
 	stream, _ := Of(1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
@@ -342,6 +448,7 @@ func TestToSlice(t *testing.T) {
 }
 
 func TestPointer(t *testing.T) {
+	fmt.Print(t.Name() + ":  ")
 	students := createStudents()
 	studentPs := make([]*student, len(students))
 	for i, s := range students {
@@ -364,6 +471,7 @@ func TestPointer(t *testing.T) {
 }
 
 func TestGroup(t *testing.T) {
+	fmt.Print(t.Name() + ":  ")
 	students := createStudents()
 	stream, _ := New(students)
 
@@ -373,7 +481,19 @@ func TestGroup(t *testing.T) {
 	fmt.Println(group)
 }
 
+func TestGroupIndex(t *testing.T) {
+	fmt.Print(t.Name() + ":  ")
+	students := createStudents()
+	stream, _ := New(students)
+
+	group := stream.GroupIndex(func(s student, i int) (int, student) {
+		return i, s
+	})
+	fmt.Println(group)
+}
+
 func TestFirstLast(t *testing.T) {
+	fmt.Print(t.Name() + ":  ")
 	students := createStudents()
 	stream, _ := New(students)
 
@@ -387,4 +507,23 @@ func TestFirstLast(t *testing.T) {
 		return s.age > 18
 	})
 	fmt.Println(last)
+}
+
+func TestValidateFunc(t *testing.T) {
+	fmt.Println(t.Name() + ":  ")
+	fn1 := func() {}
+	err1 := validateFunc(reflect.ValueOf(fn1), []reflect.Type{}, []reflect.Type{})
+	fmt.Println(fmt.Sprintf("validate 'func() {}' by in() out(): %t", err1 == nil))
+
+	fn2 := func(i int) {}
+	err2 := validateFunc(reflect.ValueOf(fn2), []reflect.Type{reflect.TypeOf(0)}, []reflect.Type{})
+	fmt.Println(fmt.Sprintf("validate 'func(int) {}' by in(int) out(): %t", err2 == nil))
+
+	fn3 := func() int { return 0 }
+	err3 := validateFunc(reflect.ValueOf(fn3), []reflect.Type{}, []reflect.Type{reflect.TypeOf(0)})
+	fmt.Println(fmt.Sprintf("validate 'func() int {}' by in() out(int): %t", err3 == nil))
+
+	fn4 := func(i int) string { return strconv.Itoa(i) }
+	err4 := validateFunc(reflect.ValueOf(fn4), []reflect.Type{reflect.TypeOf(0)}, []reflect.Type{reflect.TypeOf("")})
+	fmt.Println(fmt.Sprintf("validate 'func(int) string {}' by in(int) out(string): %t", err4 == nil))
 }

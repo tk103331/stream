@@ -2,18 +2,23 @@ package stream
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"sort"
 )
 
+var StrictMode bool
+
 type Stream struct {
 	ops  []op
 	data []interface{}
+	res  reflect.Type
 }
 
 type op struct {
 	typ string
 	fun reflect.Value
+	idx bool
 }
 
 type FuncSorter struct {
@@ -21,7 +26,7 @@ type FuncSorter struct {
 	fun  reflect.Value
 }
 
-func (s FuncSorter) Len() int            { return len(s.data) }
+func (s *FuncSorter) Len() int           { return len(s.data) }
 func (s *FuncSorter) Swap(i, j int)      { s.data[i], s.data[j] = s.data[j], s.data[i] }
 func (s *FuncSorter) Less(i, j int) bool { return call(s.fun, s.data[i], s.data[j])[0].Bool() }
 
@@ -41,7 +46,8 @@ func New(arr interface{}) (*Stream, error) {
 	} else {
 		return nil, errors.New("the type of arr parameter must be Array or Slice")
 	}
-	return &Stream{ops: ops, data: data}, nil
+
+	return &Stream{ops: ops, data: data, res: arrValue.Type().Elem()}, nil
 }
 
 // Of create a stream from some values
@@ -67,6 +73,7 @@ func Strings(args ...string) (*Stream, error) {
 // It create a stream from an iterator. itFunc: func(prev T) (next T,more bool).
 func It(initValue interface{}, itFunc interface{}) (*Stream, error) {
 	funcValue := reflect.ValueOf(itFunc)
+
 	data := make([]interface{}, 0)
 	dataValue := reflect.ValueOf(&data).Elem()
 	prev := reflect.ValueOf(initValue)
@@ -84,6 +91,12 @@ func It(initValue interface{}, itFunc interface{}) (*Stream, error) {
 // Gen create a stream by invoke genFunc. genFunc: func() (next T,more bool)
 func Gen(genFunc interface{}) (*Stream, error) {
 	funcValue := reflect.ValueOf(genFunc)
+	if StrictMode {
+		err := validateFunc(funcValue, []reflect.Type{}, []reflect.Type{})
+		if err != nil {
+			return nil, errors.New(fmt.Sprintf("%s, must be like func(prev T) (next T,more bool)", err.Error()))
+		}
+	}
 	data := make([]interface{}, 0)
 	dataValue := reflect.ValueOf(&data).Elem()
 	for {
@@ -92,6 +105,20 @@ func Gen(genFunc interface{}) (*Stream, error) {
 		if !out[1].Bool() {
 			break
 		}
+	}
+	return New(data)
+}
+
+// GenN create a stream by invoke genFunc N times. genFunc: func() (ele T)
+func GenN(num int, genFunc interface{}) (*Stream, error) {
+	if num < 0 {
+		return nil, errors.New("num is negative")
+	}
+	funcValue := reflect.ValueOf(genFunc)
+	data := make([]interface{}, num)
+	for i := 0; i < num; i++ {
+		out := call(funcValue, i)
+		data[i] = out[0].Interface()
 	}
 	return New(data)
 }
@@ -108,6 +135,13 @@ func (s *Stream) Filter(filterFunc interface{}) *Stream {
 	return s
 }
 
+// FilterIndex operation with index. filterFunc: func(o T, i int) bool
+func (s *Stream) FilterIndex(filterFunc interface{}) *Stream {
+	funcValue := reflect.ValueOf(filterFunc)
+	s.ops = append(s.ops, op{typ: "filter", fun: funcValue, idx: true})
+	return s
+}
+
 // Map operation. Map one to one
 // mapFunc: func(o T1) T2
 func (s *Stream) Map(mapFunc interface{}) *Stream {
@@ -116,11 +150,27 @@ func (s *Stream) Map(mapFunc interface{}) *Stream {
 	return s
 }
 
+// MapIndex operation with index. Map one to one
+// mapFunc: func(o T1, i int) T2
+func (s *Stream) MapIndex(mapFunc interface{}) *Stream {
+	funcValue := reflect.ValueOf(mapFunc)
+	s.ops = append(s.ops, op{typ: "map", fun: funcValue, idx: true})
+	return s
+}
+
 // FlatMap operation. Map one to many
 // mapFunc: func(o T1) []T2
 func (s *Stream) FlatMap(mapFunc interface{}) *Stream {
 	funcValue := reflect.ValueOf(mapFunc)
 	s.ops = append(s.ops, op{typ: "flatMap", fun: funcValue})
+	return s
+}
+
+// FlatMapIndex operation with index. Map one to many
+// mapFunc: func(o T1) []T2
+func (s *Stream) FlatMapIndex(mapFunc interface{}) *Stream {
+	funcValue := reflect.ValueOf(mapFunc)
+	s.ops = append(s.ops, op{typ: "flatMap", fun: funcValue, idx: true})
 	return s
 }
 
@@ -142,6 +192,13 @@ func (s *Stream) Distinct(equalFunc interface{}) *Stream {
 func (s *Stream) Peek(peekFunc interface{}) *Stream {
 	funcValue := reflect.ValueOf(peekFunc)
 	s.ops = append(s.ops, op{typ: "peek", fun: funcValue})
+	return s
+}
+
+// PeekIndex operation with index. peekFunc: func(o T)
+func (s *Stream) PeekIndex(peekFunc interface{}) *Stream {
+	funcValue := reflect.ValueOf(peekFunc)
+	s.ops = append(s.ops, op{typ: "peek", fun: funcValue, idx: true})
 	return s
 }
 
@@ -192,7 +249,7 @@ func (s *Stream) collect() []interface{} {
 		case "filter":
 			result = doFilter(result, op)
 		case "peek":
-			each(result, op.fun, emptyeachfunc)
+			each(result, op.fun, emptyeachfunc, op.idx)
 		case "map":
 			result = doMap(result, op)
 		case "flatMap":
@@ -263,7 +320,7 @@ func doFlatMap(result []interface{}, op op) []interface{} {
 			tempVlaue.Set(reflect.Append(tempVlaue, out[0].Index(i)))
 		}
 		return true
-	})
+	}, op.idx)
 	return temp
 }
 
@@ -273,7 +330,7 @@ func doMap(result []interface{}, op op) []interface{} {
 	each(result, op.fun, func(i int, it interface{}, out []reflect.Value) bool {
 		tempValue.Set(reflect.Append(tempValue, out[0]))
 		return true
-	})
+	}, op.idx)
 	return temp
 }
 
@@ -284,7 +341,7 @@ func doFilter(result []interface{}, op op) []interface{} {
 			temp = append(temp, it)
 		}
 		return true
-	})
+	}, op.idx)
 	return temp
 }
 
@@ -311,12 +368,17 @@ func (s *Stream) ToSlice(targetSlice interface{}) error {
 // actFunc: func(o T)
 func (s *Stream) ForEach(actFunc interface{}) {
 	data := s.collect()
-	each(data, reflect.ValueOf(actFunc), emptyeachfunc)
+	each(data, reflect.ValueOf(actFunc), emptyeachfunc, false)
 }
 
-// AllMatch operation.
-// matchFunc: func(o T) bool
-func (s *Stream) AllMatch(matchFunc interface{}) bool {
+// ForEachIndex executes a provided function once for each array element,and terminate the stream.
+// actFunc: func(o T, i int)
+func (s *Stream) ForEachIndex(actFunc interface{}) {
+	data := s.collect()
+	each(data, reflect.ValueOf(actFunc), emptyeachfunc, true)
+}
+
+func (s *Stream) all(matchFunc interface{}, idx bool) bool {
 	data := s.collect()
 	allMatch := true
 	each(data, reflect.ValueOf(matchFunc), func(i int, it interface{}, out []reflect.Value) bool {
@@ -325,12 +387,23 @@ func (s *Stream) AllMatch(matchFunc interface{}) bool {
 			return false
 		}
 		return true
-	})
+	}, idx)
 	return allMatch
 }
 
-// AnyMatch operation. matchFunc: func(o T) bool
-func (s *Stream) AnyMatch(matchFunc interface{}) bool {
+// AllMatch operation.
+// matchFunc: func(o T) bool
+func (s *Stream) AllMatch(matchFunc interface{}) bool {
+	return s.all(matchFunc, false)
+}
+
+// AllMatchIndex operation with index.
+// matchFunc: func(o T, i int) bool
+func (s *Stream) AllMatchIndex(matchFunc interface{}) bool {
+	return s.all(matchFunc, true)
+}
+
+func (s *Stream) any(matchFunc interface{}, idx bool) bool {
 	data := s.collect()
 	anyMatch := false
 	each(data, reflect.ValueOf(matchFunc), func(i int, it interface{}, out []reflect.Value) bool {
@@ -339,12 +412,21 @@ func (s *Stream) AnyMatch(matchFunc interface{}) bool {
 			return false
 		}
 		return true
-	})
+	}, idx)
 	return anyMatch
 }
 
-// NoneMatch operation. matchFunc: func(o T) bool
-func (s *Stream) NoneMatch(matchFunc interface{}) bool {
+// AnyMatch operation. matchFunc: func(o T) bool
+func (s *Stream) AnyMatch(matchFunc interface{}) bool {
+	return s.any(matchFunc, false)
+}
+
+// AnyMatchIndex operation with index. matchFunc: func(o T, i int) bool
+func (s *Stream) AnyMatchIndex(matchFunc interface{}) bool {
+	return s.any(matchFunc, true)
+}
+
+func (s *Stream) none(matchFunc interface{}, idx bool) bool {
 	data := s.collect()
 	noneMatch := true
 	each(data, reflect.ValueOf(matchFunc), func(i int, it interface{}, out []reflect.Value) bool {
@@ -353,8 +435,18 @@ func (s *Stream) NoneMatch(matchFunc interface{}) bool {
 			return false
 		}
 		return true
-	})
+	}, idx)
 	return noneMatch
+}
+
+// NoneMatch operation. matchFunc: func(o T) bool
+func (s *Stream) NoneMatch(matchFunc interface{}) bool {
+	return s.none(matchFunc, false)
+}
+
+// NoneMatchIndex operation with index. matchFunc: func(o T) bool
+func (s *Stream) NoneMatchIndex(matchFunc interface{}) bool {
+	return s.none(matchFunc, true)
 }
 
 // Count operation.Return the count of elements in stream.
@@ -364,12 +456,18 @@ func (s *Stream) Count() int {
 
 // Group operation. Group values by key.
 // Parameter groupFunc: func(o T1) (key T2,value T3). Return map[T2]T3
-func (s *Stream) Group(groupFunc interface{}) map[interface{}][]interface{} {
+func (s *Stream) group(groupFunc interface{}, idx bool) map[interface{}][]interface{} {
 	data := s.collect()
 	funcValue := reflect.ValueOf(groupFunc)
 	result := make(map[interface{}][]interface{})
-	for _, it := range data {
-		out := call(funcValue, it)
+	for i, it := range data {
+		var out []reflect.Value
+		if idx {
+			out = call(funcValue, it, i)
+		} else {
+			out = call(funcValue, it)
+		}
+
 		key := out[0].Interface()
 		slice, ok := result[key]
 		if !ok {
@@ -379,6 +477,18 @@ func (s *Stream) Group(groupFunc interface{}) map[interface{}][]interface{} {
 		result[key] = slice
 	}
 	return result
+}
+
+// Group operation. Group values by key.
+// Parameter groupFunc: func(o T1) (key T2,value T3). Return map[T2][]T3
+func (s *Stream) Group(groupFunc interface{}) map[interface{}][]interface{} {
+	return s.group(groupFunc, false)
+}
+
+// GroupIndex operation with index. Group values by key.
+// Parameter groupFunc: func(o T1) (key T2,value T3). Return map[T2][]T3
+func (s *Stream) GroupIndex(groupFunc interface{}) map[interface{}][]interface{} {
+	return s.group(groupFunc, true)
 }
 
 // Max operation.lessFunc: func(o1,o2 T) bool
@@ -442,17 +552,31 @@ func (s *Stream) Last(matchFunc interface{}) interface{} {
 	return nil
 }
 
-// Reduce operation. reduceFunc: func(r T2,o T) T2
-func (s *Stream) Reduce(initValue interface{}, reduceFunc interface{}) interface{} {
+func (s *Stream) reduce(initValue interface{}, reduceFunc interface{}, idx bool) interface{} {
 	data := s.collect()
 	funcValue := reflect.ValueOf(reduceFunc)
 	result := initValue
 	rValue := reflect.ValueOf(&result).Elem()
-	for _, it := range data {
-		out := call(funcValue, result, it)
-		rValue.Set(out[0])
+	for i, it := range data {
+		if idx {
+			out := call(funcValue, result, it, i)
+			rValue.Set(out[0])
+		} else {
+			out := call(funcValue, result, it)
+			rValue.Set(out[0])
+		}
 	}
 	return result
+}
+
+// Reduce operation. reduceFunc: func(r T2,o T) T2
+func (s *Stream) Reduce(initValue interface{}, reduceFunc interface{}) interface{} {
+	return s.reduce(initValue, reduceFunc, false)
+}
+
+// ReduceIndex operation with index. reduceFunc: func(r T2,o T,i int) T2
+func (s *Stream) ReduceIndex(initValue interface{}, reduceFunc interface{}) interface{} {
+	return s.reduce(initValue, reduceFunc, true)
 }
 
 // eachfunc is the function for each method,return if should continue loop
@@ -461,11 +585,18 @@ type eachfunc func(int, interface{}, []reflect.Value) bool
 // emptyeachfunc the empty eachfunc, return true
 var emptyeachfunc = func(int, interface{}, []reflect.Value) bool { return true }
 
-func each(data []interface{}, fun reflect.Value, act eachfunc) {
+func each(data []interface{}, fun reflect.Value, act eachfunc, idx bool) {
 	for i, it := range data {
-		out := call(fun, it)
-		if !act(i, it, out) {
-			break
+		if idx {
+			out := call(fun, it, i)
+			if !act(i, it, out) {
+				break
+			}
+		} else {
+			out := call(fun, it)
+			if !act(i, it, out) {
+				break
+			}
 		}
 	}
 }
@@ -476,4 +607,28 @@ func call(fun reflect.Value, args ...interface{}) []reflect.Value {
 		in[i] = reflect.ValueOf(a).Convert(fun.Type().In(i))
 	}
 	return fun.Call(in)
+}
+
+func validateFunc(fn reflect.Value, in []reflect.Type, out []reflect.Type) error {
+	fnType := fn.Type()
+	if fn.Kind() != reflect.Func {
+		return errors.New("func invalid")
+	}
+	if fnType.NumIn() != len(in) {
+		return errors.New("func in num invalid")
+	}
+	if fnType.NumOut() != len(out) {
+		return errors.New("func out num invalid")
+	}
+	for i := 0; i < fnType.NumIn(); i++ {
+		if fnType.In(i) != in[i] {
+			return errors.New("func in type invalid")
+		}
+	}
+	for i := 0; i < fnType.NumOut(); i++ {
+		if fnType.Out(i) != out[i] {
+			return errors.New("func out type invalid")
+		}
+	}
+	return nil
 }
